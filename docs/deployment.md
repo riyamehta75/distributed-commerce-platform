@@ -41,7 +41,7 @@ Create one ECR repository for each service, tag/push the images, and use those i
 - `PRODUCT_SERVICE_URL` and `INVENTORY_SERVICE_URL` on order service.
 - `ORDER_SERVICE_URL` on payment service.
 
-Use ECS Service Connect aliases `user-service`, `product-service`, `inventory-service`, `order-service`, `payment-service`, and `notification-service` on their configured container ports. Keep all service ports private; only the load balancer's HTTPS listener should be public. The Java demo currently has no JWT or role-based authorization, so it must not be used for real customer accounts or payments.
+Use ECS Service Connect aliases `user-service`, `product-service`, `inventory-service`, `order-service`, `payment-service`, and `notification-service` on their configured container ports. Keep all service ports private; only the load balancer's HTTPS listener should be public. Payments and notifications are simulations; do not use real payment data. The gateway enforces JWT, role, and ownership checks for the current demo API.
 
 The gateway validates JWTs; product/stock writes require an administrator token, and order/payment/profile access is owner-checked. Keep backend ports private, store all credentials in Secrets Manager, and never use `.env.example` credentials in AWS.
 

@@ -1,11 +1,20 @@
 # Architecture
 
-The platform uses seven independent Spring Boot applications behind an API gateway. Each service owns a PostgreSQL logical database and communicates asynchronously through Kafka for cross-service workflows. Redis is a product-cache accelerator and is not the source of inventory truth.
+The runnable demo consists of a Next.js storefront, an API gateway, and six Spring Boot business services. Each business service owns a PostgreSQL logical database. PostgreSQL, Redis, Kafka, Prometheus, Grafana, Kafka UI, and the storefront run in Docker Compose.
 
-## Communication
+## Implemented request flow
 
-Synchronous REST handles client-facing queries and commands. Kafka events propagate durable state changes between bounded contexts. No service has cross-service database credentials or foreign keys.
+The browser calls the gateway with JSON and a JWT for protected routes. The gateway routes requests to the user, product, inventory, order, payment, or notification service. Order creation reads product prices over REST, creates an order, and reserves inventory over REST. The simulated payment endpoint confirms inventory and the order through internal REST calls. PostgreSQL protects stock counts with conditional updates.
+
+## Local platform services
+
+- PostgreSQL is available on host port 5432. The six logical databases are initialized on first startup.
+- Kafka is available on host port 9092. Compose creates the topic names from `infrastructure/kafka/topics.txt`, and Kafka UI is available on port 8088.
+- Redis is available on host port 6379. It is not used by the current catalog flow.
+- Prometheus scrapes service actuator metrics on port 9090. Grafana, with a provisioned Prometheus source and dashboard, is available on port 3001.
+
+Kafka is provisioned for local development and inspection, but this version of the application does not publish or consume Kafka events. `docs/kafka-events.md` describes the reserved topic names and future event envelope. The current checkout is synchronous REST with compensating inventory release on failure.
 
 ## Trade-offs
 
-Microservices increase independent deployment and ownership, but add network, schema, and operational complexity. Database-per-service avoids coupling while requiring saga compensation and eventual consistency. Kafka provides durable fan-out and replay; consumers remain at least-once and business logic is deduplicated.
+This is a local development/demo system. The services have independent schemas and migrations, but share a PostgreSQL server and Compose network. Payments and notifications are simulations. Production use would need durable event publishing and consumers, retry and dead-letter handling, stronger secrets management, access controls, TLS, and operational policies.
