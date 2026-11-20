@@ -1,4 +1,12 @@
 package com.example.distributedcommerce.orderservice;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-@SpringBootApplication public class OrderServiceApplication { public static void main(String[] args){ SpringApplication.run(OrderServiceApplication.class,args); } }
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+@SpringBootApplication
+@EnableScheduling
+public class OrderServiceApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(OrderServiceApplication.class, args);
+    }
+}

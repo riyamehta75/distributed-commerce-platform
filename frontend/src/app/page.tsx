@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { api, AuthResponse, Order, Product, User } from "@/lib/api";
+import { api, AuthResponse, formatINR, Order, Product, User } from "@/lib/api";
 
 type CartLine = { product: Product; quantity: number };
 
@@ -207,7 +207,7 @@ export default function Home() {
         {products.length === 0 ? <div className="empty"><span>✳</span><h3>The shelves are ready.</h3><p>{user?.role === "ADMIN" ? "Add your first product in Seller Studio below to bring the market to life." : "Check back soon for our first collection."}</p></div> :
           <div className="product-grid">{products.map((product, index) => <article className="product-card" key={product.id}>
             <div className={`product-image tone-${index % 4}`}><span className="product-index">0{index + 1}</span><div className="product-shape"><i /></div><button onClick={() => addToCart(product)} aria-label={`Add ${product.name} to bag`}>＋</button></div>
-            <div className="product-details"><div><h3>{product.name}</h3><p>{product.description || "A considered piece for everyday living."}</p></div><strong>${Number(product.price).toFixed(2)}</strong></div>
+            <div className="product-details"><div><h3>{product.name}</h3><p>{product.description || "A considered piece for everyday living."}</p></div><strong>{formatINR(Number(product.price))}</strong></div>
           </article>)}</div>}
       </section>
 
@@ -215,8 +215,8 @@ export default function Home() {
         <div className="panel" id="bag">
           <p className="eyebrow">YOUR SELECTION</p><h2>The bag <em>({cart.reduce((sum, line) => sum + line.quantity, 0)})</em></h2>
           {cart.length === 0 ? <p className="muted">Your bag is taking a well-deserved breather.</p> : <>
-            <div className="cart-lines">{cart.map((line) => <div className="cart-line" key={line.product.id}><div><strong>{line.product.name}</strong><span>Qty {line.quantity}</span></div><strong>${(line.product.price * line.quantity).toFixed(2)}</strong></div>)}</div>
-            <div className="total"><span>Total</span><strong>${cartTotal.toFixed(2)}</strong></div>
+            <div className="cart-lines">{cart.map((line) => <div className="cart-line" key={line.product.id}><div><strong>{line.product.name}</strong><span>Qty {line.quantity}</span></div><strong>{formatINR(line.product.price * line.quantity)}</strong></div>)}</div>
+            <div className="total"><span>Total</span><strong>{formatINR(cartTotal)}</strong></div>
             <button className="button dark full" disabled={!user || busy} onClick={checkout}>{user ? (busy ? "Placing order…" : "Reserve & place order") : "Sign in to checkout"}</button>
           </>}
         </div>
@@ -224,7 +224,7 @@ export default function Home() {
           <p className="eyebrow">ORDER DESK</p><h2>Track the <em>journey.</em></h2>
           {activeOrder && <div className="order-callout">
             <div className="order-heading"><strong>Order {activeOrder.id.slice(0, 8).toUpperCase()}</strong><span className={`status ${activeOrder.status.toLowerCase()}`}>{activeOrder.status.replaceAll("_", " ")}</span></div>
-            <p>{activeOrder.items.length} line item(s) · ${Number(activeOrder.total).toFixed(2)}</p>
+            <p>{activeOrder.items.length} line item(s) · {formatINR(Number(activeOrder.total))}</p>
             {activeOrder.status === "AWAITING_PAYMENT" && <div className="button-row"><button className="button dark" disabled={busy} onClick={() => pay(activeOrder)}>Simulate payment</button><button className="button outline" disabled={busy} onClick={() => cancel(activeOrder)}>Cancel</button></div>}
           </div>}
           {!user ? <div className="auth">
@@ -244,7 +244,7 @@ export default function Home() {
       {user?.role === "ADMIN" && <section className="seller section" id="seller">
         <div className="seller-intro"><p className="eyebrow">FOR THE MAKERS</p><h2>Put your work<br />out <em>in the world.</em></h2><p>Seller Studio creates a catalog listing and initializes stock in one quick step.</p></div>
         <form className="seller-form" onSubmit={addDemoProduct}>
-          <div className="field-pair"><label>Product name<input name="productName" required maxLength={255} placeholder="Hand-thrown ceramic cup" /></label><label>Price (USD)<input name="price" type="number" step="0.01" min="0.01" required placeholder="32.00" /></label></div>
+          <div className="field-pair"><label>Product name<input name="productName" required maxLength={255} placeholder="Hand-thrown ceramic cup" /></label><label>Price (INR)<input name="price" type="number" step="0.01" min="0.01" required placeholder="₹2,650.00" /></label></div>
           <label>Short description<input name="description" placeholder="A little detail about what makes it special" /></label>
           <div className="field-pair"><label>Starting quantity<input name="quantity" type="number" min="0" required defaultValue="12" /></label><button className="button light" disabled={busy}>{busy ? "Publishing…" : "Publish product ↗"}</button></div>
         </form>

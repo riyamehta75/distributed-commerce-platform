@@ -6,5 +6,15 @@ spring:
   datasource.password: ${POSTGRES_PASSWORD:commerce}
   jpa.hibernate.ddl-auto: validate
   flyway.enabled: true
-  kafka.bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    consumer:
+      group-id: notification-service
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
+commerce.kafka.notification-topic: notification.requested
 management.endpoints.web.exposure.include: health,info,prometheus

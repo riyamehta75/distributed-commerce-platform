@@ -2,6 +2,8 @@
 
 The browser calls the API gateway at `NEXT_PUBLIC_API_URL`. For local use this is `http://localhost:8080`. All requests and responses use JSON except `204 No Content` operations. UUID path values are shown as `{id}`.
 
+All catalog prices, order totals, payment amounts, and seller-entered prices are denominated in Indian rupees (INR). The API represents monetary values as decimal numbers; the storefront formats them as `₹` amounts. Existing numeric values are interpreted as INR without exchange-rate conversion.
+
 ## Authentication
 
 `POST /api/users/register` and `POST /api/users/login` return `{ "user": { "id", "email", "name", "role" }, "token": "...", "expiresInSeconds": 43200 }`. Send the returned token on protected routes:
@@ -22,7 +24,7 @@ Registration creates a `CUSTOMER`. The administrator account is seeded from `ADM
 
 - `GET /?q=ceramic` — public search of active products.
 - `GET /{id}` — public product lookup.
-- `POST /` — administrator only; `{ "name": "Cup", "description": "Hand thrown", "price": 32.00 }`.
+- `POST /` — administrator only; `{ "name": "Cup", "description": "Hand thrown", "price": 2650.00 }` (INR).
 - `PUT /{id}` — administrator only; update product fields.
 - `DELETE /{id}` — administrator only; soft-delete product.
 

@@ -6,8 +6,8 @@ Order creation synchronously reads current catalog prices, persists an order, an
 
 Inventory uses a conditional PostgreSQL update to prevent available stock from going below zero under concurrent reservations. Payments do not charge a real provider, and refunds are simulated.
 
-## Kafka and future saga work
+## Kafka notification flow
 
-Compose starts Kafka and creates the topics listed in `infrastructure/kafka/topics.txt`. At this stage, business services do not publish or consume events; outbox and processed-event tables are not an active delivery pipeline. The topics and event envelope in `docs/kafka-events.md` are a starting contract for a future asynchronous saga.
+Order and payment services write notification events to their existing outbox tables. A scheduled relay publishes pending records to the `notification.requested` Kafka topic, keyed by aggregate ID. The notification service consumes the topic, inserts each event ID into `processed_events`, and records the simulated notification in its own database. The inbox insert and notification record share a database transaction, so Kafka redelivery does not create duplicate notifications. Kafka producer acknowledgements are required before an outbox record is marked published; a publish failure leaves it available for retry.
 
-A production event flow should write business state and outbox records in one database transaction, publish with retries, deduplicate deliveries by event ID, partition by aggregate ID, and define compensation and dead-letter behavior. Those mechanisms are not implemented in this demo.
+Inventory reservation and payment confirmation remain synchronous REST calls. This demo does not send email, implement dead-letter handling, or provide production-grade saga compensation and retry policies. Kafka topics and the envelope format are documented in `docs/kafka-events.md`.

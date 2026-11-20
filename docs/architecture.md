@@ -13,8 +13,8 @@ The browser calls the gateway with JSON and a JWT for protected routes. The gate
 - Redis is available on host port 6379. It is not used by the current catalog flow.
 - Prometheus scrapes service actuator metrics on port 9090. Grafana, with a provisioned Prometheus source and dashboard, is available on port 3001.
 
-Kafka is provisioned for local development and inspection, but this version of the application does not publish or consume Kafka events. `docs/kafka-events.md` describes the reserved topic names and future event envelope. The current checkout is synchronous REST with compensating inventory release on failure.
+Order and payment services relay outbox notifications through Kafka to the notification service. The notification service deduplicates messages by event ID before storing notification history. Inventory reservation and payment confirmation remain synchronous REST calls. See `docs/kafka-events.md` for the event envelope and topic details.
 
 ## Trade-offs
 
-This is a local development/demo system. The services have independent schemas and migrations, but share a PostgreSQL server and Compose network. Payments and notifications are simulations. Production use would need durable event publishing and consumers, retry and dead-letter handling, stronger secrets management, access controls, TLS, and operational policies.
+This is a local development/demo system. The services have independent schemas and migrations, but share a PostgreSQL server and Compose network. Payments and notifications are simulations. Production use would need transactionally coupled outbox writes, retry and dead-letter handling, stronger secrets management, access controls, TLS, and operational policies.

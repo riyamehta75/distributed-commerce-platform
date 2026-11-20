@@ -5,7 +5,7 @@
 - **Vercel** runs only the Next.js application in `frontend/`.
 - **AWS** runs the Java containers. The API Gateway must have a public HTTPS URL for a browser-deployed frontend.
 - **PostgreSQL** stores application data. Local Compose creates one database per service. For AWS, create the six databases on RDS or configure equivalent isolated schemas and set each service's `SPRING_DATASOURCE_URL`.
-- **Kafka and Redis are not required for the implemented synchronous checkout path.** Their infrastructure is present in Compose, but the current API flow does not publish/consume Kafka events or cache catalog reads.
+- **Kafka is required for order/payment notification delivery.** Compose creates the configured topics before starting those services. Redis is present but is not used for catalog caching.
 
 ## Vercel
 
@@ -42,6 +42,8 @@ Create one ECR repository for each service, tag/push the images, and use those i
 - `ORDER_SERVICE_URL` on payment service.
 
 Use ECS Service Connect aliases `user-service`, `product-service`, `inventory-service`, `order-service`, `payment-service`, and `notification-service` on their configured container ports. Keep all service ports private; only the load balancer's HTTPS listener should be public. Payments and notifications are simulations; do not use real payment data. The gateway enforces JWT, role, and ownership checks for the current demo API.
+
+For the implemented Kafka notification flow, provide the order, payment, and notification services with the same `KAFKA_BOOTSTRAP_SERVERS` value and create the `notification.requested` topic before starting them. Product prices and all order/payment amounts are denominated in INR.
 
 The gateway validates JWTs; product/stock writes require an administrator token, and order/payment/profile access is owner-checked. Keep backend ports private, store all credentials in Secrets Manager, and never use `.env.example` credentials in AWS.
 

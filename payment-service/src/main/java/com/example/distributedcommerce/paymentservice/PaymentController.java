@@ -1,5 +1,7 @@
 package com.example.distributedcommerce.paymentservice;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -12,9 +14,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
-import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -23,14 +25,17 @@ public class PaymentController {
     private final RestClient rest;
     private final String orderServiceUrl;
     private final String internalApiToken;
+    private final ObjectMapper objectMapper;
 
     public PaymentController(JdbcTemplate jdbc, RestClient.Builder builder,
                              @Value("${services.order-url:http://order-service:8084}") String orderServiceUrl,
-                             @Value("${internal.api-token}") String internalApiToken) {
+                             @Value("${internal.api-token}") String internalApiToken,
+                             ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.rest = builder.build();
         this.orderServiceUrl = orderServiceUrl;
         this.internalApiToken = internalApiToken;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping
@@ -74,6 +79,8 @@ public class PaymentController {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                         "Payment completed but order confirmation is pending; retry with the same idempotency key");
             }
+            enqueueNotification(payment, order.userId(), "PAYMENT_COMPLETED",
+                    "Payment of INR " + payment.amount().toPlainString() + " completed.");
         }
         return payment;
     }
@@ -88,17 +95,37 @@ public class PaymentController {
     @PostMapping("/{id}/refund")
     public PaymentView refund(@PathVariable UUID id, @RequestHeader("X-User-Id") UUID authenticatedUser) {
         PaymentView existing = find(id);
-        requireOwner(getOrder(existing.orderId()), authenticatedUser);
+        OrderSummary order = getOrder(existing.orderId());
+        requireOwner(order, authenticatedUser);
         int changed = jdbc.update("UPDATE payments SET status='REFUNDED',updated_at=now() WHERE id=? AND status='COMPLETED'", id);
         if (changed == 0) {
             PaymentView payment = find(id);
-            if (payment.status().equals("REFUNDED")) return payment;
+            if (payment.status().equals("REFUNDED")) {
+                enqueueNotification(payment, order.userId(), "PAYMENT_REFUNDED",
+                        "Refund of INR " + payment.amount().toPlainString() + " completed.");
+                return payment;
+            }
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only completed payments can be refunded");
         }
         PaymentView payment = find(id);
         jdbc.update("INSERT INTO payment_refunds(id,payment_id,amount,status) VALUES (?,?,?,'COMPLETED')",
                 UUID.randomUUID(), id, payment.amount());
+        enqueueNotification(payment, order.userId(), "PAYMENT_REFUNDED",
+                "Refund of INR " + payment.amount().toPlainString() + " completed.");
         return payment;
+    }
+
+    private void enqueueNotification(PaymentView payment, UUID userId, String eventType, String message) {
+        UUID eventId = UUID.nameUUIDFromBytes((eventType + ":" + payment.id()).getBytes(StandardCharsets.UTF_8));
+        CommerceEvent event = new CommerceEvent(eventId, "notification.requested", payment.id(),
+                payment.orderId(), Instant.now(), 1,
+                new NotificationPayload(userId.toString(), eventType, message));
+        try {
+            jdbc.update("INSERT INTO outbox(id,aggregate_id,event_type,payload) VALUES (?,?,?,?) ON CONFLICT (id) DO NOTHING",
+                    eventId, payment.id(), "notification.requested", objectMapper.writeValueAsString(event));
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Could not serialize payment notification event", ex);
+        }
     }
 
     private OrderSummary getOrder(UUID id) {
@@ -130,4 +157,7 @@ public class PaymentController {
     public record PaymentRequest(@NotNull UUID orderId, @NotBlank String idempotencyKey) {}
     public record PaymentView(UUID id, UUID orderId, String idempotencyKey, BigDecimal amount, String status, Instant createdAt) {}
     private record OrderSummary(UUID id, UUID userId, String status, BigDecimal total, Instant createdAt, Object[] items) {}
+    public record CommerceEvent(UUID eventId, String eventType, UUID aggregateId, UUID correlationId,
+                                Instant timestamp, int version, NotificationPayload payload) {}
+    public record NotificationPayload(String recipient, String eventType, String message) {}
 }

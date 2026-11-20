@@ -21,6 +21,9 @@ flowchart LR
   Pay --> PG
   N --> PG
   I -->|atomic reserve| I
+  O -->|outbox events| K[(Kafka)]
+  Pay -->|outbox events| K
+  K -->|notification.requested| N
 ```
 
 ## Services
@@ -44,8 +47,10 @@ PostgreSQL logical databases are `userdb`, `productdb`, `inventorydb`, `orderdb`
 - **Inventory concurrency:** PostgreSQL conditionally decrements stock only when enough units remain. A concurrent H2 test exercises 100 reservations against 10 units.
 - **Order flow:** the order service synchronously reads catalog prices, creates an order, and asks inventory to reserve. Payment uses an idempotency key and confirms the order. Failed reservations trigger release/cancel compensation.
 - **Payment:** the provider is simulated; no real charge is made.
+- **Currency:** product, order, and payment amounts are denominated in INR and displayed as Indian rupees.
+- **Kafka:** order and payment lifecycle notifications are written to their outboxes, relayed to Kafka, and persisted by the notification service with event-ID deduplication.
 - **Authentication:** the gateway validates 12-hour HS256 JWTs. Registration/login are public; catalog reads are public; product/stock mutations require the configured administrator. Order, payment, and profile access is owner-checked. Internal reservation/confirmation calls use `INTERNAL_API_TOKEN`.
-- **Important scope:** Kafka, Redis caching, outbox publishing, and production-grade saga retries are not implemented in this runnable demo flow.
+- **Important scope:** notifications are simulated and no email is sent. Redis caching and production-grade saga retries are not implemented in this runnable demo flow.
 
 ## Prerequisites
 
@@ -88,7 +93,7 @@ curl -f http://localhost:8080/actuator/health
 docker compose ps
 ```
 
-Prometheus is available at `http://localhost:9090`, Grafana at `http://localhost:3001`, Kafka UI at `http://localhost:8088`, and PostgreSQL at `localhost:5432`. Grafana's local login is `GRAFANA_USER` / `GRAFANA_PASSWORD` from `.env` (defaults: `admin` / `local-grafana-change-me`). The database user/password are `POSTGRES_USER` / `POSTGRES_PASSWORD` (defaults: `commerce` / `commerce`). Use database `userdb`, `productdb`, `inventorydb`, `orderdb`, `paymentdb`, or `notificationdb`. Example: `psql -h localhost -U commerce -d orderdb`. Kafka is available to host clients at `localhost:9092` and to Compose services at `kafka:9092`; topics in `infrastructure/kafka/topics.txt` are created automatically with three partitions. Kafka UI shows topic and broker state. The services currently execute checkout synchronously; Kafka is provisioned for inspection and development but isn't on the checkout request path yet.
+Prometheus is available at `http://localhost:9090`, Grafana at `http://localhost:3001`, Kafka UI at `http://localhost:8088`, and PostgreSQL at `localhost:5432`. Grafana's local login is `GRAFANA_USER` / `GRAFANA_PASSWORD` from `.env` (defaults: `admin` / `local-grafana-change-me`). The database user/password are `POSTGRES_USER` / `POSTGRES_PASSWORD` (defaults: `commerce` / `commerce`). Use database `userdb`, `productdb`, `inventorydb`, `orderdb`, `paymentdb`, or `notificationdb`. Example: `psql -h localhost -U commerce -d orderdb`. Kafka is available to host clients at `localhost:9092` and to Compose services at `kafka:9092`; topics in `infrastructure/kafka/topics.txt` are created automatically with three partitions. Kafka UI shows topic and broker state. Order and payment notification events flow through Kafka to the notification service; checkout still uses synchronous REST for inventory reservation and payment confirmation.
 
 The API endpoint list and copy-paste workflow are in [docs/api-documentation.md](docs/api-documentation.md). To exercise registration, product creation, stock setup, order placement, and simulated payment in one go, run `./scripts/smoke-test.sh` after the stack starts. It needs `curl` and `jq`, and uses the admin credentials from `.env`.
 
@@ -125,4 +130,4 @@ docker compose down -v
 
 ## Known limitations
 
-This is a local demo, not production commerce software. Payments and notifications are simulations. Kafka topics and Redis run locally, but the checkout flow does not publish/consume Kafka events and Redis is not used for catalog caching. Scheduled reservation expiry and automated AWS provisioning are not included. Keep it on disposable test data; do not enter real payment data. Change all local example passwords and secrets before exposing any port beyond your machine.
+This is a local demo, not production commerce software. Payments and notifications are simulations. Kafka is used for order/payment notification events; Redis is not used for catalog caching. Scheduled reservation expiry and automated AWS provisioning are not included. Keep it on disposable test data; do not enter real payment data. Change all local example passwords and secrets before exposing any port beyond your machine.

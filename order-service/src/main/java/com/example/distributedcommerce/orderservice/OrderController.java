@@ -1,5 +1,7 @@
 package com.example.distributedcommerce.orderservice;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
@@ -14,10 +16,11 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.UUID;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -27,16 +30,19 @@ public class OrderController {
     private final String productServiceUrl;
     private final String inventoryServiceUrl;
     private final String internalApiToken;
+    private final ObjectMapper objectMapper;
 
     public OrderController(JdbcTemplate jdbc, RestClient.Builder restClientBuilder,
                            @Value("${services.product-url:http://product-service:8082}") String productServiceUrl,
                            @Value("${services.inventory-url:http://inventory-service:8083}") String inventoryServiceUrl,
-                           @Value("${internal.api-token}") String internalApiToken) {
+                           @Value("${internal.api-token}") String internalApiToken,
+                           ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.rest = restClientBuilder.build();
         this.productServiceUrl = productServiceUrl;
         this.inventoryServiceUrl = inventoryServiceUrl;
         this.internalApiToken = internalApiToken;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping
@@ -97,6 +103,8 @@ public class OrderController {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Inventory service request failed; order was cancelled");
         }
         jdbc.update("UPDATE orders SET status='AWAITING_PAYMENT',updated_at=now() WHERE id=?", orderId);
+        enqueueNotification(orderId, request.userId(), "ORDER_CREATED",
+                "Your order is reserved and awaiting payment.");
         return loadOrder(orderId);
     }
 
@@ -140,7 +148,10 @@ public class OrderController {
     public OrderView confirm(@PathVariable UUID id, @RequestHeader("X-Internal-Token") String token) {
         requireInternalToken(token);
         OrderView before = loadOrder(id);
-        if (before.status().equals("CONFIRMED")) return before;
+        if (before.status().equals("CONFIRMED")) {
+            enqueueNotification(id, before.userId(), "ORDER_CONFIRMED", "Your order is confirmed.");
+            return before;
+        }
         if (!before.status().equals("AWAITING_PAYMENT")) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
         }
@@ -153,8 +164,10 @@ public class OrderController {
             if (!current.status().equals("CONFIRMED")) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Order is not awaiting payment");
             }
+            enqueueNotification(id, current.userId(), "ORDER_CONFIRMED", "Your order is confirmed.");
             return current;
         }
+        enqueueNotification(id, before.userId(), "ORDER_CONFIRMED", "Your order is confirmed.");
         return loadOrder(id);
     }
 
@@ -164,13 +177,37 @@ public class OrderController {
         if (!authenticatedUser.equals(order.userId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot cancel another user's order");
         }
-        if (order.status().equals("CANCELLED")) return order;
+        if (order.status().equals("CANCELLED")) {
+            enqueueNotification(id, order.userId(), "ORDER_CANCELLED", "Your order was cancelled.");
+            return order;
+        }
         if (!order.status().equals("PENDING") && !order.status().equals("AWAITING_PAYMENT")) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only unpaid orders can be cancelled");
         }
         releaseQuietly(id);
-        jdbc.update("UPDATE orders SET status='CANCELLED',updated_at=now() WHERE id=? AND status IN ('PENDING','AWAITING_PAYMENT')", id);
+        int changed = jdbc.update("UPDATE orders SET status='CANCELLED',updated_at=now() WHERE id=? AND status IN ('PENDING','AWAITING_PAYMENT')", id);
+        if (changed == 0) {
+            OrderView current = loadOrder(id);
+            if (current.status().equals("CANCELLED")) {
+                enqueueNotification(id, current.userId(), "ORDER_CANCELLED", "Your order was cancelled.");
+                return current;
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only unpaid orders can be cancelled");
+        }
+        enqueueNotification(id, order.userId(), "ORDER_CANCELLED", "Your order was cancelled.");
         return loadOrder(id);
+    }
+
+    private void enqueueNotification(UUID orderId, UUID userId, String eventType, String message) {
+        UUID eventId = UUID.nameUUIDFromBytes((eventType + ":" + orderId).getBytes(StandardCharsets.UTF_8));
+        CommerceEvent event = new CommerceEvent(eventId, "notification.requested", orderId, orderId,
+                Instant.now(), 1, new NotificationPayload(userId.toString(), eventType, message));
+        try {
+            jdbc.update("INSERT INTO outbox(id,aggregate_id,event_type,payload) VALUES (?,?,?,?) ON CONFLICT (id) DO NOTHING",
+                    eventId, orderId, "notification.requested", objectMapper.writeValueAsString(event));
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Could not serialize order notification event", ex);
+        }
     }
 
     private void releaseQuietly(UUID orderId) {
@@ -199,4 +236,7 @@ public class OrderController {
     private record PricedItem(UUID productId, int quantity, BigDecimal unitPrice, BigDecimal lineTotal) {}
     private record ReservationRequest(UUID orderId, UUID productId, int quantity) {}
     private record OrderHeader(UUID id, UUID userId, String status, BigDecimal total, java.time.Instant createdAt) {}
+    public record CommerceEvent(UUID eventId, String eventType, UUID aggregateId, UUID correlationId,
+                                Instant timestamp, int version, NotificationPayload payload) {}
+    public record NotificationPayload(String recipient, String eventType, String message) {}
 }

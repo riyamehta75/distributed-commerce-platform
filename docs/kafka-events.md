@@ -8,4 +8,13 @@ Compose creates every non-empty topic listed in `infrastructure/kafka/topics.txt
 docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
 ```
 
-The topic names are reserved for future integration. The current checkout is synchronous REST and does not publish or consume these events. When event handling is added, the proposed envelope is `eventId`, `eventType`, `aggregateId`, `correlationId`, `timestamp`, `version`, and `payload`. Production consumers should use explicit consumer groups, idempotent processing, retry/dead-letter topics, schema compatibility checks, and bounded retries.
+## Implemented notification events
+
+Order and payment services write notification envelopes to their existing `outbox` tables. Their scheduled relays publish pending records to `notification.requested`, using the order or payment ID as the Kafka key. Events include:
+
+- `ORDER_CREATED`, `ORDER_CONFIRMED`, and `ORDER_CANCELLED`
+- `PAYMENT_COMPLETED` and `PAYMENT_REFUNDED`
+
+The JSON envelope contains `eventId`, `eventType`, `aggregateId`, `correlationId`, `timestamp`, `version`, and a `payload` with `recipient` (the customer UUID), `eventType`, and `message`. Amounts included in messages are INR. The notification service uses the `notification-service` consumer group, persists event IDs in `processed_events`, and stores a simulated notification. The inbox and notification inserts are transactional, so repeated delivery of an event ID is ignored.
+
+The checkout still uses synchronous REST for product prices, inventory reservations, and order confirmation. Other listed topics are reserved for future event flows. Production consumers should add dead-letter handling, schema compatibility checks, and bounded retry policies.
