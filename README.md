@@ -78,7 +78,7 @@ The `java -version` and `mvn -version` output must both report Java 21. If Homeb
 
 On Linux, set `JAVA_HOME` to the installed JDK 21 directory (often `/usr/lib/jvm/java-21-openjdk-amd64`) and add `$JAVA_HOME/bin` to `PATH`. Start and enable Docker Engine using the instructions for your Linux distribution. Run `docker info` and continue only after it succeeds.
 
-Compose starts the storefront and all supporting services together. Open `http://localhost:3000`; the gateway is at `http://localhost:8080`. For frontend-only development, run `cd frontend && cp .env.example .env.local && npm ci && npm run dev` in another terminal.
+Compose starts the storefront and all supporting services together. Open `http://localhost:3002`; the gateway is at `http://localhost:8080`. For frontend-only development, run `cd frontend && cp .env.example .env.local && npm ci && npm run dev` in another terminal; change `FRONTEND_ORIGIN` in `.env` to `http://localhost:3000` for that dev server. Set `FRONTEND_PORT` in `.env` if port 3002 is already in use.
 For local seller access, sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env`. Change these credentials and the JWT/internal secrets before any public deployment.
 
 ## Verify
