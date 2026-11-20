@@ -1,0 +1,11 @@
+order.created
+order.confirmed
+order.cancelled
+inventory.reserved
+inventory.rejected
+inventory.released
+payment.initiated
+payment.completed
+payment.failed
+payment.refunded
+notification.requested

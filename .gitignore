@@ -1,0 +1,10 @@
+target/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+.idea/
+.vscode/
+*.iml
+.env
+
+frontend/tsconfig.tsbuildinfo

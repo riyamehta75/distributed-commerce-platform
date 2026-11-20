@@ -1,0 +1,15 @@
+server.port: 8081
+spring:
+  application.name: user-service
+  datasource.url: jdbc:postgresql://postgres:5432/userdb
+  datasource.username: ${POSTGRES_USER:commerce}
+  datasource.password: ${POSTGRES_PASSWORD:commerce}
+  jpa.hibernate.ddl-auto: validate
+  flyway.enabled: true
+  jpa.open-in-view: false
+demo:
+  admin:
+    email: ${ADMIN_EMAIL}
+    password: ${ADMIN_PASSWORD}
+jwt.secret: ${JWT_SECRET}
+management.endpoints.web.exposure.include: health,info,prometheus

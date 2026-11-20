@@ -1,0 +1,4 @@
+CREATE TABLE orders (id UUID PRIMARY KEY, user_id UUID NOT NULL, status VARCHAR(32) NOT NULL, total_amount NUMERIC(19,2) NOT NULL, version BIGINT NOT NULL DEFAULT 0, payment_idempotency_key VARCHAR(255), created_at TIMESTAMP NOT NULL DEFAULT now(), updated_at TIMESTAMP NOT NULL DEFAULT now());
+CREATE TABLE order_items (id UUID PRIMARY KEY, order_id UUID NOT NULL REFERENCES orders(id), product_id UUID NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>0), unit_price NUMERIC(19,2) NOT NULL);
+CREATE TABLE outbox (id UUID PRIMARY KEY, aggregate_id UUID NOT NULL, event_type VARCHAR(100) NOT NULL, payload TEXT NOT NULL, published BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMP NOT NULL DEFAULT now());
+CREATE TABLE processed_events (event_id UUID PRIMARY KEY, received_at TIMESTAMP NOT NULL DEFAULT now());
