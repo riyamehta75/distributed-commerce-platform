@@ -1,6 +1,6 @@
 # Kafka Topics and Local Access
 
-Compose starts a single-node Kafka broker in KRaft mode. Kafka UI is available at `http://localhost:8088`. Host applications connect to `localhost:9092`; Compose applications connect to `kafka:9092`. The broker has three partitions per topic and replication factor one, suitable for local development only.
+Compose starts a single-node Kafka broker in KRaft mode. Kafka UI is available at `http://localhost:8088`. Compose applications connect to `kafka:9092`; the broker port is not published to the host. The broker has three partitions per topic and replication factor one, suitable for local development only.
 
 Compose creates every non-empty topic listed in `infrastructure/kafka/topics.txt` on startup. Inspect the list in Kafka UI or run:
 

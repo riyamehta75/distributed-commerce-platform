@@ -93,23 +93,13 @@ curl -f http://localhost:8080/actuator/health
 docker compose ps
 ```
 
-Prometheus is available at `http://localhost:9090`, Grafana at `http://localhost:3001`, Kafka UI at `http://localhost:8088`, and PostgreSQL at `localhost:5432`. Grafana's local login is `GRAFANA_USER` / `GRAFANA_PASSWORD` from `.env` (defaults: `admin` / `local-grafana-change-me`). The database user/password are `POSTGRES_USER` / `POSTGRES_PASSWORD` (defaults: `commerce` / `commerce`). Use database `userdb`, `productdb`, `inventorydb`, `orderdb`, `paymentdb`, or `notificationdb`. Example: `psql -h localhost -U commerce -d orderdb`. Kafka is available to host clients at `localhost:9092` and to Compose services at `kafka:9092`; topics in `infrastructure/kafka/topics.txt` are created automatically with three partitions. Kafka UI shows topic and broker state. Order and payment notification events flow through Kafka to the notification service; checkout still uses synchronous REST for inventory reservation and payment confirmation.
+Prometheus is available at `http://localhost:9090`, Grafana at `http://localhost:3001`, Kafka UI at `http://localhost:8088`, and PostgreSQL at `localhost:5432`. Grafana's local login is `GRAFANA_USER` / `GRAFANA_PASSWORD` from `.env` (defaults: `admin` / `local-grafana-change-me`). The database user/password are `POSTGRES_USER` / `POSTGRES_PASSWORD` (defaults: `commerce` / `commerce`). Use database `userdb`, `productdb`, `inventorydb`, `orderdb`, `paymentdb`, or `notificationdb`. Example: `psql -h localhost -U commerce -d orderdb`. Kafka is available to Compose services at `kafka:9092`; topics in `infrastructure/kafka/topics.txt` are created automatically with three partitions. Kafka UI shows topic and broker state. Order and payment notification events flow through Kafka to the notification service; checkout still uses synchronous REST for inventory reservation and payment confirmation.
 
 The API endpoint list and copy-paste workflow are in [docs/api-documentation.md](docs/api-documentation.md). To exercise registration, product creation, stock setup, order placement, and simulated payment in one go, run `./scripts/smoke-test.sh` after the stack starts. It needs `curl` and `jq`, and uses the admin credentials from `.env`.
 
-## Deploy the storefront to Vercel
+## Deploy the demo
 
-1. Push this project to a Git provider, then import it in Vercel.
-2. Set **Root Directory** to `frontend` and framework preset to Next.js.
-3. Configure `NEXT_PUBLIC_API_URL` to the public HTTPS URL of the AWS API gateway.
-4. Configure the API gateway's `FRONTEND_ORIGIN` to the exact Vercel production URL (and preview URL if needed).
-5. Deploy. The storefront will not have working product/order data until the AWS backend is deployed and reachable.
-
-## AWS backend
-
-The Java containers are built for ECS/Fargate. The AWS environment needs a public load balancer for the gateway; private service networking for the six backends; PostgreSQL; and Secrets Manager values for database credentials, `JWT_SECRET`, `INTERNAL_API_TOKEN`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. Provide the service endpoint environment variables to the gateway and the order/payment service URLs to the services. Use the same strong `INTERNAL_API_TOKEN` on inventory, order, and payment services. Never use `.env.example` values in a public deployment.
-
-AWS resources are not provisioned automatically by this repository. Do not expose this demo publicly until user authorization, TLS, rate limits, production secrets, and operational monitoring are configured. Deployment will incur AWS charges.
+For a reduced-cost deployment, host the Compose backend on one Linux VM and deploy `frontend/` to Vercel Hobby. The VM needs enough resources for the Java services, PostgreSQL, and Kafka; free-tier eligibility or permanent free availability is not guaranteed. Follow [docs/deployment.md](docs/deployment.md) for the VM, HTTPS, firewall, and Vercel configuration. The repository does not provision the VM or automate deployment.
 
 ## Tests
 
